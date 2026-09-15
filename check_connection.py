@@ -5,7 +5,7 @@ import requests
 
 
 def main():
-    required = ['THREADS_ACCESS_TOKEN', 'THREADS_USER_ID',
+    required = ['THREADS_ACCESS_TOKEN',
                 'COUPANG_ACCESS_KEY', 'COUPANG_SECRET_KEY']
     missing = [name for name in required if not os.getenv(name)]
     if missing:
@@ -24,7 +24,11 @@ def main():
         if profile.get('username') != 'jamestv1007':
             print('Threads account mismatch; expected jamestv1007.')
             return 1
-        if str(profile.get('id')) != os.environ['THREADS_USER_ID']:
+        if not profile.get('id'):
+            print('Threads returned no account ID.')
+            return 1
+        print('Verified Threads user ID:', profile['id'])
+        if os.getenv('THREADS_USER_ID') and str(profile['id']) != os.environ['THREADS_USER_ID']:
             print('THREADS_USER_ID does not match token owner.')
             return 1
         from bot import coupang_auth, COUPANG_DOMAIN, SEARCH_PATH
