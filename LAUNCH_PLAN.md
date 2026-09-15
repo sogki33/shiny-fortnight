@@ -4,7 +4,7 @@
 
 ## 2026-09-16T08:30:00+09:00
 
-![intro-v1](assets/intro-kitchen.png)
+![intro-v1](assets/intro-phone-v2.png)
 
 여긴 대놓고 쿠팡파트너스 하는 계정이야.
 근데 장바구니까지 따라가서 등 떠밀진 않을게 ㅋㅋ
@@ -22,7 +22,7 @@
 
 ## 2026-09-16T12:30:00+09:00
 
-![chair-humor-v1](assets/clothes-chair.png)
+![chair-humor-v1](assets/chair-phone-v2.png)
 
 의자 샀는데
 옷이 더 오래 앉아 있음 ㅋㅋ
@@ -38,7 +38,7 @@
 
 ## 2026-09-16T20:30:00+09:00
 
-![drawer-tip-v1](assets/drawer-boxes.png)
+![drawer-tip-v1](assets/drawer-phone-v2.png)
 
 정리하려고 수납함 샀는데
 그 수납함 둘 자리가 없는 상황 ㅋㅋ
@@ -56,7 +56,7 @@
 
 ## 2026-09-17T08:30:00+09:00
 
-![atojet-kitchen-v1](assets/faucet-lifestyle.png)
+![atojet-kitchen-v1](assets/faucet-phone-v2.png)
 
 주방 필터 살 때
 후기보다 먼저 볼 것: 우리 집에 맞나? ㅋㅋ
@@ -73,4 +73,4 @@ https://link.coupang.com/a/g4ntewoJ40
 
 ## 이미지 제작
 
-내장 imagegen 사용. 평범한 집의 자연광 사진 스타일. 의자 위 한 번 입은 옷, 빈 상자로 칸을 나눈 서랍, 실제 상품 외형을 참조한 미설치 주방 필터. 모든 사진은 연출 이미지이며 실제 사용 경험으로 표현하지 않았습니다.
+내장 imagegen 사용. 네일아트한 손이 등장하는 평범한 집의 실내등·비스듬한 휴대폰 시점. 의자 위 한 번 입은 옷, 빈 상자로 칸을 나눈 서랍, 실제 상품 외형을 참조한 미설치 주방 필터. 모든 사진은 연출 이미지이며 실제 사용 경험으로 표현하지 않았습니다.
