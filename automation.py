@@ -98,6 +98,13 @@ def publish(dry_run=False):
         print('No approved posts available; skipped publishing.')
         return
     validate(selected)
+    if selected.get('not_before'):
+        due = datetime.fromisoformat(selected['not_before'])
+        if due.tzinfo is None:
+            raise ValueError('Scheduled time must include timezone.')
+        if datetime.now(timezone.utc) < due:
+            print('Next post scheduled for:', selected['not_before'])
+            return
     if dry_run:
         print('Validated draft:', selected['id'])
         return

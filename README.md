@@ -1,8 +1,8 @@
 # Threads × Coupang
 
-Target: jamestv1007. Real Threads identity and Coupang search verified 2026-09-16 KST. No live post published yet.
+Target: jamestv1007. Real Threads identity and Coupang search verified 2026-09-16 KST. First live post published successfully; see LIVE_POST.md.
 
-GitHub Actions runs around KST 08:30, 12:30, 20:30; delays are possible. It renews the token when 27 days old, discovers products, and publishes at most one reviewed queue entry. The queue is currently empty, so posting is skipped.
+GitHub Actions runs around KST 08:30, 12:30, 20:30; delays are possible. It renews the token when 27 days old, discovers products, and publishes at most one reviewed queue entry. Four additional reviewed posts are scheduled; see LAUNCH_PLAN.md. Each waits until its not_before time.
 
 ## Content
 
