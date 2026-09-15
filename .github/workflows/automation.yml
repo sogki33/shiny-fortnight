@@ -1,0 +1,49 @@
+name: Product discovery and reviewed publishing
+on:
+  schedule:
+    - cron: '30 23,3,11 * * *'
+  workflow_dispatch:
+    inputs:
+      command:
+        type: choice
+        options: [discover, preview, publish, refresh]
+        default: discover
+permissions:
+  contents: write
+concurrency:
+  group: threads-automation
+  cancel-in-progress: false
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      COUPANG_ACCESS_KEY: ${{ secrets.COUPANG_ACCESS_KEY }}
+      COUPANG_SECRET_KEY: ${{ secrets.COUPANG_SECRET_KEY }}
+      THREADS_ACCESS_TOKEN: ${{ secrets.THREADS_ACCESS_TOKEN }}
+      THREADS_USER_ID: ${{ secrets.THREADS_USER_ID }}
+      TOKEN_ENCRYPTION_KEY: ${{ secrets.TOKEN_ENCRYPTION_KEY }}
+      PERSIST_GIT: '1'
+      COMMAND: ${{ inputs.command || 'scheduled' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install -r requirements.txt
+      - run: |
+          git config user.name 'threads-bot'
+          git config user.email 'bot@users.noreply.github.com'
+          python -m unittest discover
+      - name: Run automation
+        run: |
+          case "$COMMAND" in
+            scheduled)
+              python automation.py discover
+              python automation.py publish
+              python automation.py refresh
+              ;;
+            preview) python automation.py publish --dry-run ;;
+            discover|publish|refresh) python automation.py "$COMMAND" ;;
+            *) exit 1 ;;
+          esac
