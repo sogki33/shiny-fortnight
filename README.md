@@ -1,7 +1,10 @@
 # Threads × Coupang connection setup
 
-Status: connection setup in progress. Scheduled publishing is NOT enabled.
+Status: Threads profile and Coupang product-search connections verified from GitHub Actions on 2026-09-16 KST. Scheduled publishing is NOT enabled.
 Target Threads account: `jamestv1007`.
+
+Verification: https://github.com/sogki33/shiny-fortnight/actions/runs/34988379625
+All four required repository secrets are registered. No live post has been published.
 
 The initial bot is preserved, but its Korean-food-only selection and publishing flow still need to be adapted to the agreed broader product concept and a reviewed content queue. Do not run `bot.py` for live publishing yet.
 
