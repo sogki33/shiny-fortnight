@@ -2,6 +2,7 @@
 import os
 import sys
 import requests
+from automation import token
 
 
 def main():
@@ -15,7 +16,7 @@ def main():
         response = requests.get(
             'https://graph.threads.net/v1.0/me',
             params={'fields': 'id,username'},
-            headers={'Authorization': 'Bearer ' + os.environ['THREADS_ACCESS_TOKEN']},
+            headers={'Authorization': 'Bearer ' + token()},
             timeout=30)
         if response.status_code != 200:
             print('Threads authentication failed. HTTP', response.status_code)

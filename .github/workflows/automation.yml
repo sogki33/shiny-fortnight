@@ -39,9 +39,9 @@ jobs:
         run: |
           case "$COMMAND" in
             scheduled)
+              python automation.py refresh
               python automation.py discover
               python automation.py publish
-              python automation.py refresh
               ;;
             preview) python automation.py publish --dry-run ;;
             discover|publish|refresh) python automation.py "$COMMAND" ;;
