@@ -12,7 +12,7 @@ watchlist.csv (품번, 사이즈, 포이즌 시세)
 ## 데스크톱 앱 (Windows)
 
 1. [파이썬](https://www.python.org/downloads/)을 설치합니다. 설치 화면에서 **Add python.exe to PATH**를 체크하세요.
-2. 이 `poizon_resell` 폴더를 PC에 내려받고 **`설치_바탕화면바로가기.bat`**를 더블클릭합니다.
+2. 이 `poizon_resell` 폴더를 PC에 내려받고 **`install_shortcut.bat`(바로가기 설치)**를 더블클릭합니다.
 3. 바탕화면에 생긴 **"포이즌 리셀 스캐너"** 아이콘으로 실행합니다.
 
 앱에는 스캔, 관심 상품 편집, 마진 계산기, 설정(수수료와 디스코드 웹훅) 탭이 있습니다. 스캔 결과 행을 더블클릭하면 구매 페이지가 열립니다.
