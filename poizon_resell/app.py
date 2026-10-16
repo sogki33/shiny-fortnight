@@ -14,7 +14,9 @@ CONFIG = r.ROOT / 'config.json'
 WEBHOOK_FILE = r.ROOT / 'discord_webhook.txt'
 FIELDS = ('style_code', 'name', 'size', 'poizon_price')
 CFG_LABELS = {'fee_rate': '수수료율 (0.10 = 10%)', 'min_fee': '최소 수수료', 'shipping': '배송비',
-              'min_profit': '알림 최소 순이익', 'min_roi': '알림 최소 수익률 (0.05 = 5%)'}
+              'min_profit': '알림 최소 순이익', 'min_roi': '알림 최소 수익률 (0.05 = 5%)',
+              'card_discount': '카드 할인·적립률 (0.03 = 3%)', 'risk_rate': '검수 리스크 적립률 (판매가 대비)'}
+FLOAT_KEYS = ('fee_rate', 'min_roi', 'card_discount', 'risk_rate')
 
 
 def won(n):
@@ -47,7 +49,7 @@ class App(tk.Tk):
         self.status.pack(side='left', padx=12)
         cols = ('ok', 'style_code', 'size', 'name', 'buy', 'sell', 'fee', 'profit', 'roi', 'max_buy')
         heads = ('', '품번', '사이즈', '상품명', '매입가', '포이즌', '수수료', '순이익', '수익률', '최대매입가')
-        widths = (30, 110, 60, 260, 80, 80, 70, 80, 60, 90)
+        widths = (40, 110, 60, 260, 80, 80, 70, 80, 60, 90)
         self.result = ttk.Treeview(f, columns=cols, show='headings')
         for c, h, w in zip(cols, heads, widths):
             self.result.heading(c, text=h)
@@ -55,7 +57,7 @@ class App(tk.Tk):
         self.result.tag_configure('ok', background='#dff5e1')
         self.result.pack(fill='both', expand=True, pady=8)
         self.result.bind('<Double-1>', self.open_url)
-        ttk.Label(f, text='행을 더블클릭하면 구매 페이지가 열립니다. 초록색 = 알림 기준 통과').pack(anchor='w')
+        ttk.Label(f, text='행을 더블클릭하면 구매 페이지가 열립니다. 초록색 = 알림 기준 통과, ⚠ = 최소 수수료 구간(15만 원 미만)').pack(anchor='w')
         self.urls = {}
 
     def start_scan(self):
@@ -102,7 +104,7 @@ class App(tk.Tk):
         self.urls.clear()
         for x in results:
             iid = self.result.insert('', 'end', tags=('ok',) if x['ok'] else (), values=(
-                '✅' if x['ok'] else '', x['style_code'], x['size'], x['name'], won(x['buy']), won(x['sell']),
+                ('✅' if x['ok'] else '') + ('⚠' if x.get('min_fee_zone') else ''), x['style_code'], x['size'], x['name'], won(x['buy']), won(x['sell']),
                 won(x['fee']), won(x['profit']), f"{x['roi']:.1%}", won(x['max_buy'])))
             self.urls[iid] = x['url']
         hits = sum(x['ok'] for x in results)
@@ -242,7 +244,7 @@ class App(tk.Tk):
 
     def save_settings(self):
         try:
-            cfg = {k: (float if k in ('fee_rate', 'min_roi') else int)(e.get().replace(',', ''))
+            cfg = {k: (float if k in FLOAT_KEYS else int)(e.get().replace(',', ''))
                    for k, e in self.cfg_entries.items()}
         except ValueError:
             messagebox.showerror('입력 오류', '숫자로 입력하세요.')

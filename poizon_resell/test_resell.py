@@ -33,6 +33,23 @@ class MarginTests(unittest.TestCase):
         self.assertLess(r.profit(mb + 100, 200000, CFG), CFG['min_profit'])
 
 
+class CostOptionTests(unittest.TestCase):
+    def test_card_discount_and_risk(self):
+        cfg = dict(CFG, card_discount=0.05, risk_rate=0.02)
+        # 120,000 - 15,000 - 3,000 - 2,400 - 95,000 + 9,091 = 13,691
+        self.assertEqual(r.profit(100000, 120000, cfg), 13691)
+        mb = r.max_buy_price(200000, cfg)
+        self.assertGreaterEqual(r.profit(mb, 200000, cfg), cfg['min_profit'])
+        self.assertLess(r.profit(mb + 100, 200000, cfg), cfg['min_profit'])
+
+    def test_no_vat_source_gets_no_refund(self):
+        self.assertEqual(r.profit(100000, 120000, CFG, vat_ok=False), 2000)
+
+    def test_min_fee_zone(self):
+        self.assertTrue(r.min_fee_zone(149000, CFG))
+        self.assertFalse(r.min_fee_zone(150000, CFG))
+
+
 class MusinsaTests(unittest.TestCase):
     def test_exact_style_code_only_and_skips_used(self):
         s = fake_session([goods('덩크 로우 W / DD1503-101', 139000),

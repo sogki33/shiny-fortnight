@@ -23,6 +23,9 @@ DEFAULT_CONFIG = {
     'min_fee': 15000,          # 최소 수수료
     'shipping': 3000,          # 인천 검수센터까지 배송비
     'vat_refund': True,        # 일반과세자 수출 영세율: 매입 부가세(매입가/11) 환급
+                               # (영수증에 부가세가 찍히는 매입처만 해당, SOURCE_VAT 참고)
+    'card_discount': 0.0,      # 카드 할인·적립·상품권 등 실결제 할인율 (0.03 = 3%)
+    'risk_rate': 0.0,          # 검수 불합격·페널티 대비 적립률 (판매가 대비, 0.02 = 2%)
     'min_profit': 10000,       # 알림 기준 최소 순이익
     'min_roi': 0.05,           # 알림 기준 최소 수익률 (순이익 / 매입가)
 }
@@ -41,19 +44,30 @@ def poizon_fee(sell, cfg):
     return max(round(sell * cfg['fee_rate']), cfg['min_fee'])
 
 
-def vat_share(cfg):
-    return 1 / 11 if cfg['vat_refund'] else 0.0
+def vat_share(cfg, vat_ok=True):
+    return 1 / 11 if cfg['vat_refund'] and vat_ok else 0.0
 
 
-def profit(buy, sell, cfg):
-    """순이익 = 판매가 - 수수료 - 배송비 - 매입가 + 매입 부가세 환급."""
-    return round(sell - poizon_fee(sell, cfg) - cfg['shipping'] - buy + buy * vat_share(cfg))
+def costs(sell, cfg):
+    """매입가와 무관한 판매 비용: 수수료 + 배송비 + 리스크 적립."""
+    return poizon_fee(sell, cfg) + cfg['shipping'] + sell * cfg.get('risk_rate', 0)
 
 
-def max_buy_price(sell, cfg, target_profit=None):
-    """목표 순이익을 남길 수 있는 최대 매입가."""
+def profit(buy, sell, cfg, vat_ok=True):
+    """순이익 = 판매가 - 비용 - 실결제액(매입가 - 카드할인) + 매입 부가세 환급."""
+    paid = buy * (1 - cfg.get('card_discount', 0))
+    return round(sell - costs(sell, cfg) - paid + buy * vat_share(cfg, vat_ok))
+
+
+def min_fee_zone(sell, cfg):
+    """최소 수수료가 적용되는 가격대인지 (이 구간은 수수료 비율이 급격히 커짐)."""
+    return sell * cfg['fee_rate'] < cfg['min_fee']
+
+
+def max_buy_price(sell, cfg, target_profit=None, vat_ok=True):
+    """목표 순이익을 남길 수 있는 최대 매입가 (판매처 표시가 기준)."""
     target = cfg['min_profit'] if target_profit is None else target_profit
-    return int((sell - poizon_fee(sell, cfg) - cfg['shipping'] - target) / (1 - vat_share(cfg)))
+    return int((sell - costs(sell, cfg) - target) / (1 - cfg.get('card_discount', 0) - vat_share(cfg, vat_ok)))
 
 
 def normalize_code(code):
@@ -89,6 +103,8 @@ def musinsa_search(style_code, session=requests):
 
 
 SOURCES = {'musinsa': musinsa_search}
+# 매입처별로 영수증에 부가세가 포함되는지 (False면 환급 없이 계산). 해외배송·병행수입 위주 판매처는 False로.
+SOURCE_VAT = {'musinsa': True}
 
 
 def read_watchlist(path):
@@ -104,13 +120,15 @@ def evaluate(row, offers, cfg):
     live = [o for o in offers if not o.sold_out]
     if not live:
         return None
-    best = min(live, key=lambda o: o.price)
     sell = row['poizon_price']
-    p = profit(best.price, sell, cfg)
+    vat = lambda o: SOURCE_VAT.get(o.source, False)
+    best = max(live, key=lambda o: profit(o.price, sell, cfg, vat(o)))  # 부가세 여부가 달라 최저가 ≠ 최고이익
+    p = profit(best.price, sell, cfg, vat(best))
     return {
         'style_code': row['style_code'], 'name': row.get('name') or best.name, 'size': row.get('size', ''),
         'source': best.source, 'buy': best.price, 'sell': sell, 'fee': poizon_fee(sell, cfg),
-        'profit': p, 'roi': round(p / best.price, 4), 'max_buy': max_buy_price(sell, cfg), 'url': best.url,
+        'profit': p, 'roi': round(p / best.price, 4), 'max_buy': max_buy_price(sell, cfg, vat_ok=vat(best)),
+        'url': best.url, 'min_fee_zone': min_fee_zone(sell, cfg),
         'ok': p >= cfg['min_profit'] and p / best.price >= cfg['min_roi'],
     }
 
@@ -140,6 +158,8 @@ def report(results):
     lines = []
     for r in results:
         mark = '✅' if r['ok'] else '  '
+        if r.get('min_fee_zone'):
+            mark += '⚠최소수수료'
         lines.append(f"{mark} {r['style_code']} {r['size']} | 매입 {fmt(r['buy'])}({r['source']}) → 포이즌 {fmt(r['sell'])}"
                      f" | 순이익 {fmt(r['profit'])} ({r['roi']:.1%}) | 최대매입가 {fmt(r['max_buy'])}\n   {r['url']}")
     return '\n'.join(lines) or '조회된 상품 없음'
