@@ -50,3 +50,18 @@ python -m unittest -v test_resell        # 테스트
 - **자동 결제는 하지 않습니다.** 알림을 보고 직접 사거나 기존 도구로 구매하세요. 플랫폼 약관상 매크로 구매는 계정 제재 대상이 될 수 있습니다.
 - 매입처를 추가하려면 `SOURCES`에 `함수(style_code, session) -> [Offer]`를 등록하면 됩니다 (예: 29CM, 나이키 공홈, SSF).
 - 무신사 가격은 쿠폰과 회원 등급 할인 전 `finalPrice` 기준입니다. 실제 결제가는 더 낮을 수 있습니다.
+
+## 포이즌 공식 판매자 API 연결 (선택)
+
+포이즌 오픈플랫폼(open.poizon.com)을 쓰면 시세 조회와 입찰을 프로그램에서 할 수 있습니다.
+
+1. 포이즌 판매자(입점) 계정으로 open.poizon.com 콘솔에 로그인 → 앱 생성
+2. 앱 상세의 "API Permission Package"에서 상품 조회·리스팅(입찰) 권한 신청
+3. "Application Info"의 App Key / App Secret을 `poizon_keys.json`에 저장 (git에 올라가지 않음)
+   ```json
+   {"app_key": "...", "app_secret": "...", "access_token": ""}
+   ```
+4. 연결 확인: `python poizon_api.py lookup DD1503-101`
+
+서명 방식은 공식 문서 기준으로 구현했고 테스트로 확인했지만, 실제 키로는 아직 검증하지 못했습니다.
+요청 주소(base_url)와 일부 파라미터 이름은 키 발급 후 첫 조회 결과로 맞춰야 할 수 있습니다.

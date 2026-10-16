@@ -77,7 +77,7 @@ class PoizonClient:
     def from_file(cls, path=KEYS_FILE, **kw):
         path = Path(path)
         if not path.exists():
-            raise PoizonError(f'{path.name} 파일이 없습니다. 설정 탭에서 App Key/Secret을 입력하세요.')
+            raise PoizonError(f'{path.name} 파일이 없습니다. poizon_keys.json에 app_key, app_secret을 입력하세요 (README 참고).')
         d = json.loads(path.read_text(encoding='utf-8'))
         if not d.get('app_key') or not d.get('app_secret'):
             raise PoizonError('App Key 또는 App Secret이 비어 있습니다.')
