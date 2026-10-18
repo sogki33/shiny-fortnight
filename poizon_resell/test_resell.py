@@ -50,6 +50,30 @@ class CostOptionTests(unittest.TestCase):
         self.assertFalse(r.min_fee_zone(150000, CFG))
 
 
+class CandidateTests(unittest.TestCase):
+    def test_break_even_gives_target_profit(self):
+        for buy in (60000, 150000, 400000):
+            be = r.break_even_sell(buy, CFG)
+            self.assertGreaterEqual(r.profit(buy, be, CFG), CFG['min_profit'])
+            self.assertLess(r.profit(buy, be - 200, CFG), CFG['min_profit'])
+
+    def test_candidates_filter_and_sort(self):
+        g = lambda name, price, disc, rev=10, **kw: dict(goods(name, price, **kw), finalDiscount=disc, reviewCount=rev)
+        items = [g('에어 맥스 / HJ5996-005', 160300, 30), g('양말 3PK 블랙', 17000, 32),
+                 g('데슈츠 / DO8951-001', 64350, 35), g('코르테즈 / HF0263-005', 95200, 10),
+                 g('데슈츠 / DO8951-001', 64350, 35), g('리프트 / HM8288-001', 74500, 50, rev=0)]
+        c = r.musinsa_candidates(items, CFG)
+        self.assertEqual([x['style_code'] for x in c], ['DO8951-001', 'HJ5996-005'])
+        self.assertEqual(c[0]['break_even'], r.break_even_sell(64350, CFG))
+
+    def test_candidates_skip_apparel_and_cap_brand(self):
+        g = lambda name, disc, brand: dict(goods(name, 50000), finalDiscount=disc, reviewCount=5, brandName=brand)
+        items = [g('SST 트랙 팬츠 / II0753', 80, 'A')] + [g(f'가젤 / IG06{i}0', 60, 'A') for i in range(5)] + [g('덩크 / DD1503-101', 30, 'N')]
+        c = r.musinsa_candidates(items, CFG, per_brand=3)
+        self.assertNotIn('II0753', [x['style_code'] for x in c])
+        self.assertEqual([x['brand'] for x in c], ['A', 'A', 'A', 'N'])
+
+
 class MusinsaTests(unittest.TestCase):
     def test_exact_style_code_only_and_skips_used(self):
         s = fake_session([goods('덩크 로우 W / DD1503-101', 139000),

@@ -70,6 +70,54 @@ def max_buy_price(sell, cfg, target_profit=None, vat_ok=True):
     return int((sell - costs(sell, cfg) - target) / (1 - cfg.get('card_discount', 0) - vat_share(cfg, vat_ok)))
 
 
+def break_even_sell(buy, cfg, target=None, vat_ok=True):
+    """목표 순이익을 남기려면 포이즌에서 최소 얼마에 팔아야 하는지 (원 단위 올림)."""
+    target = cfg['min_profit'] if target is None else target
+    base = target + cfg['shipping'] + buy * (1 - cfg.get('card_discount', 0)) - buy * vat_share(cfg, vat_ok)
+    risk = cfg.get('risk_rate', 0)
+    s = (base + cfg['min_fee']) / (1 - risk)          # 최소 수수료 구간
+    if s * cfg['fee_rate'] >= cfg['min_fee']:
+        s = base / (1 - cfg['fee_rate'] - risk)       # 비율 수수료 구간
+    return int(-(-s // 100) * 100)
+
+
+STYLE_RE = re.compile(r'/\s*([A-Z0-9]{2,}[A-Z0-9-]*\d[A-Z0-9-]*)\s*$')
+
+
+NON_SHOE = ('팬츠', '자켓', '재킷', '티셔츠', '셔츠', '후드', '스웨트', '양말', '삭스', '모자', '캡', '가방', '백팩', '저지',
+            '쇼츠', '레깅스', '져지', '조거', '베스트', '파카', '패딩', '크루', '탑', '드레스', '스커트')
+
+
+def musinsa_candidates(items, cfg, n=10, min_discount=20, min_reviews=1, per_brand=3):
+    """무신사 목록(JSON list)에서 품번이 있는 할인 신발을 골라 손익분기 포이즌 판매가와 함께 반환."""
+    out, seen = [], set()
+    for g in items:
+        m = STYLE_RE.search(g.get('goodsName') or '')
+        if not m or g.get('isSoldOut') or g.get('usedConditionGrade'):
+            continue
+        code = m.group(1)
+        if any(w in g['goodsName'] for w in NON_SHOE):
+            continue
+        disc = g.get('finalDiscount') or g.get('saleRate') or 0
+        if code in seen or disc < min_discount or (g.get('reviewCount') or 0) < min_reviews:
+            continue
+        seen.add(code)
+        buy = int(g.get('finalPrice') or g.get('price'))
+        be = break_even_sell(buy, cfg, vat_ok=SOURCE_VAT.get('musinsa', False))
+        out.append({'style_code': code, 'name': g['goodsName'].rsplit('/', 1)[0].strip(),
+                    'brand': g.get('brandName', ''), 'normal': g.get('normalPrice'), 'buy': buy, 'discount': disc,
+                    'reviews': g.get('reviewCount') or 0, 'break_even': be,
+                    'url': g.get('goodsLinkUrl') or f"https://www.musinsa.com/products/{g.get('goodsNo')}"})
+    # 할인율 높고 리뷰(판매) 많은 순
+    out.sort(key=lambda c: (c['discount'], c['reviews']), reverse=True)
+    picked, count = [], {}
+    for c in out:  # 한 브랜드가 목록을 독차지하지 않게
+        if count.get(c['brand'], 0) < per_brand:
+            picked.append(c)
+            count[c['brand']] = count.get(c['brand'], 0) + 1
+    return picked[:n]
+
+
 def normalize_code(code):
     return re.sub(r'[^A-Z0-9]', '', (code or '').upper())
 
