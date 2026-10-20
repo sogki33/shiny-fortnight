@@ -3,13 +3,17 @@
 무신사 검색 API 응답(JSON 파일들)을 받아 할인 신발 후보를 고르고,
 포이즌에서 최소 얼마에 팔려야 목표 순이익이 남는지(손익분기 판매가)를 붙여 HTML로 만든다.
 
-  python daily_report.py raw1.json raw2.json ... -o report.html
+  python daily_report.py urls                       # 무신사 검색 URL
+  python daily_report.py pool raw*.json -o pool.json  # 후보군 + 크림 검색 URL
+  python daily_report.py products pool.json search_results*.json   # 크림 상품 URL
+  python daily_report.py final pool.json product_results*.json -o report.html
 """
 import argparse
 import html
 import json
 from datetime import datetime, timedelta, timezone
 
+import kream
 import resell as r
 
 KST = timezone(timedelta(hours=9))
@@ -37,22 +41,78 @@ def won(n):
     return f'{int(n):,}원'
 
 
-def render(cands, cfg, now):
+def read_results(paths):
+    """fetch_content 결과 파일들 → {url: result}. 파일은 {"results": [...]} 또는 [...] 형식."""
+    out = {}
+    for p in paths:
+        data = json.loads(open(p, encoding='utf-8').read())
+        for res in (data.get('results') if isinstance(data, dict) else data) or []:
+            out[res.get('url')] = res
+            if res.get('final_url'):
+                out[res['final_url']] = res
+    return out
+
+
+def build_pool(raw_paths, cfg, n=40):
+    """무신사 목록에서 크림 시세를 확인할 후보군 (할인 10% 이상, 브랜드당 5개)."""
+    return r.musinsa_candidates(load_items(raw_paths), cfg, n=n, min_discount=10, per_brand=5)
+
+
+def attach_products(pool, search_results):
+    for c in pool:
+        res = search_results.get(kream.search_url(c['style_code']))
+        c['kream_url'] = kream.product_from_search(res) if res else None
+    return pool
+
+
+def finalize(pool, product_results, cfg, n=10):
+    """사이즈별 최근 체결가가 손익분기 이상인 상품만, 예상 순이익 큰 순으로."""
+    vat_ok = r.SOURCE_VAT.get('musinsa', False)
+    winners = []
+    for c in pool:
+        res = product_results.get(c.get('kream_url') or '')
+        if not res:
+            continue
+        info = kream.parse_product(res.get('text') or '')
+        if info['model'] and r.normalize_code(c['style_code']) not in r.normalize_code(info['model']):
+            continue  # 다른 상품으로 연결된 경우 제외
+        sizes = kream.profitable_sizes(info['trades'], c['break_even'])
+        if not sizes:
+            continue
+        c = dict(c, kream=info, sizes={sz: {'price': pr, 'profit': r.profit(c['buy'], pr, cfg, vat_ok)}
+                                       for sz, pr in sizes.items()})
+        c['best_profit'] = max(v['profit'] for v in c['sizes'].values())
+        winners.append(c)
+    winners.sort(key=lambda c: c['best_profit'], reverse=True)
+    return winners[:n]
+
+
+def won(n):
+    return f'{int(n):,}원'
+
+
+def render(cands, cfg, now, checked=0):
+    e = html.escape
     rows = []
     for i, c in enumerate(cands, 1):
-        e = html.escape
+        sizes = ''.join(f'<li><b>{e(sz)}</b> 체결 {won(v["price"])} → 순이익 <b class="pf">{won(v["profit"])}</b></li>'
+                        for sz, v in sorted(c['sizes'].items(), key=lambda kv: -kv[1]['profit']))
+        k = c['kream']
         rows.append(f'''<li class="card">
   <div class="top"><span class="rank">{i}</span><span class="nm">{e(c['brand'])} · {e(c['name'])}</span></div>
   <div class="code">{e(c['style_code'])}</div>
   <dl>
-    <dt>무신사 가격</dt><dd>{won(c['buy'])} <s>{won(c['normal'])}</s> <b class="disc">{c['discount']}%</b></dd>
-    <dt>포이즌 손익분기</dt><dd class="be">{won(c['break_even'])} 이상</dd>
-    <dt>리뷰</dt><dd>{c['reviews']:,}개</dd>
+    <dt>무신사 매입가</dt><dd>{won(c['buy'])} <b class="disc">{c['discount']}%</b></dd>
+    <dt>손익분기 판매가</dt><dd>{won(c['break_even'])}</dd>
+    <dt>크림 누적 거래</dt><dd>{(k['total_trades'] or 0):,}건</dd>
   </dl>
-  <div class="acts"><a href="{e(c['url'])}" target="_blank" rel="noopener">무신사에서 보기</a>
+  <div class="szh">수익 나는 사이즈 (최근 실제 체결가 기준)</div>
+  <ul class="sizes">{sizes}</ul>
+  <div class="acts"><a href="{e(c['url'])}" target="_blank" rel="noopener">무신사에서 사이즈 확인</a>
+  <a href="{e(c['kream_url'])}" target="_blank" rel="noopener">크림 시세</a>
   <button type="button" data-copy="{e(c['style_code'])}">품번 복사</button></div>
 </li>''')
-    body = '\n'.join(rows) or '<li class="card">오늘은 조건에 맞는 할인 상품이 없습니다.</li>'
+    body = '\n'.join(rows) or '<li class="card">오늘은 실제 체결가 기준으로 수익이 나는 상품이 없습니다. 사지 마세요.</li>'
     return f'''<title>오늘의 포이즌 후보</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <style>
@@ -77,8 +137,10 @@ ul {{ list-style:none; margin:0; padding:0; display:grid; gap:10px }}
 .code {{ font:600 14px var(--num); color:var(--muted) }}
 dl {{ display:grid; grid-template-columns:auto 1fr; gap:4px 12px; margin:0 }} dt {{ color:var(--muted); font-size:13px }}
 dd {{ margin:0; text-align:right; font-family:var(--num); font-variant-numeric:tabular-nums }}
-s {{ color:var(--muted); font-size:12px }} .disc {{ color:var(--hot) }} .be {{ font-weight:700; color:var(--accent) }}
-.acts {{ display:flex; gap:8px; flex-wrap:wrap }}
+.disc {{ color:var(--hot) }} .pf {{ color:var(--accent) }}
+.szh {{ font-size:13px; color:var(--muted); margin-top:4px }}
+.sizes {{ gap:2px; font-family:var(--num); font-size:14px; font-variant-numeric:tabular-nums }}
+.acts {{ display:flex; gap:8px; flex-wrap:wrap; margin-top:4px }}
 .acts a, .acts button {{ font:600 14px var(--font); border:1px solid var(--line); border-radius:8px; padding:8px 12px;
   background:var(--bg); color:var(--fg); text-decoration:none; cursor:pointer }}
 a:focus-visible, button:focus-visible {{ outline:2px solid var(--accent); outline-offset:2px }}
@@ -86,14 +148,14 @@ a:focus-visible, button:focus-visible {{ outline:2px solid var(--accent); outlin
 </style>
 <main>
   <header><h1>오늘의 포이즌 후보</h1>
-  <p class="sub">{now:%Y년 %m월 %d일 %H:%M} 기준 · 무신사 할인 신발 {len(cands)}개</p></header>
-  <div class="how"><b>쓰는 법</b><ol>
-    <li>품번을 복사해 포이즌 앱에서 검색합니다.</li>
-    <li>사이즈별 판매가가 <b>손익분기 가격 이상</b>이면 순이익 {won(cfg['min_profit'])} 이상 남습니다.</li>
-    <li>최근 거래량도 꼭 확인하세요. 안 팔리면 재고가 됩니다.</li></ol></div>
+  <p class="sub">{now:%Y년 %m월 %d일 %H:%M} 기준 · {checked}개 상품의 실제 체결가를 확인해 수익 나는 {len(cands)}개만 남김</p></header>
+  <div class="how"><b>기준</b><ol>
+    <li>무신사에서 지금 살 수 있는 가격으로 매입.</li>
+    <li>크림 최근 체결가가 손익분기(순이익 {won(cfg['min_profit'])}) 이상인 <b>사이즈만</b> 표시.</li>
+    <li>무신사에 그 사이즈 재고가 있는지, 포이즌 앱 시세도 같은지 확인한 뒤 사세요.</li></ol></div>
   <ul>{body}</ul>
-  <p class="foot">계산 기준: 수수료 {cfg['fee_rate']:.0%}(최소 {won(cfg['min_fee'])}), 배송비 {won(cfg['shipping'])},
-  부가세 환급 {'반영' if cfg['vat_refund'] else '미반영'}. 무신사 가격은 쿠폰·적립 전 가격입니다. 포이즌 시세는 자동으로 확인하지 않았습니다.</p>
+  <p class="foot">계산: 수수료 {cfg['fee_rate']:.0%}(최소 {won(cfg['min_fee'])}), 배송비 {won(cfg['shipping'])},
+  부가세 환급 {'반영' if cfg['vat_refund'] else '미반영'}. 판매가는 크림(국내) 최근 체결가이며 포이즌 시세와 다를 수 있습니다.</p>
 </main>
 <script>
 document.querySelectorAll('[data-copy]').forEach(b => b.addEventListener('click', () => {{
@@ -107,21 +169,36 @@ document.querySelectorAll('[data-copy]').forEach(b => b.addEventListener('click'
 
 
 def main(argv=None):
-    ap = argparse.ArgumentParser()
-    ap.add_argument('json_files', nargs='*')
-    ap.add_argument('-o', '--out', default='report.html')
-    ap.add_argument('-n', type=int, default=10)
-    ap.add_argument('--urls', action='store_true', help='조회할 무신사 URL만 출력')
+    ap = argparse.ArgumentParser(description='1) urls → 2) pool → 3) products → 4) final')
+    sub = ap.add_subparsers(dest='cmd', required=True)
+    sub.add_parser('urls', help='무신사 검색 URL 출력')
+    p = sub.add_parser('pool', help='무신사 raw JSON → 후보군 + 크림 검색 URL 출력')
+    p.add_argument('raw', nargs='+'); p.add_argument('-o', default='pool.json')
+    p = sub.add_parser('products', help='크림 검색 결과 → 상품 URL 출력')
+    p.add_argument('pool'); p.add_argument('results', nargs='+')
+    p = sub.add_parser('final', help='크림 상품 페이지 → 수익 상품 리포트')
+    p.add_argument('pool'); p.add_argument('results', nargs='+'); p.add_argument('-o', default='report.html')
     a = ap.parse_args(argv)
-    if a.urls:
-        print('\n'.join(musinsa_url(k) for k in KEYWORDS))
-        return
     cfg = r.load_config()
-    cands = r.musinsa_candidates(load_items(a.json_files), cfg, n=a.n)
-    open(a.out, 'w', encoding='utf-8').write(render(cands, cfg, datetime.now(KST)))
-    print(f'{len(cands)}개 후보 → {a.out}')
-    for c in cands:
-        print(f"{c['style_code']:14} {c['discount']:>3}%  매입 {c['buy']:>9,}  손익분기 {c['break_even']:>9,}  {c['name']}")
+    if a.cmd == 'urls':
+        print('\n'.join(musinsa_url(k) for k in KEYWORDS))
+    elif a.cmd == 'pool':
+        pool = build_pool(a.raw, cfg)
+        open(a.o, 'w', encoding='utf-8').write(json.dumps(pool, ensure_ascii=False))
+        print('\n'.join(kream.search_url(c['style_code']) for c in pool))
+    elif a.cmd == 'products':
+        pool = attach_products(json.load(open(a.pool, encoding='utf-8')), read_results(a.results))
+        open(a.pool, 'w', encoding='utf-8').write(json.dumps(pool, ensure_ascii=False))
+        print('\n'.join(c['kream_url'] for c in pool if c.get('kream_url')))
+    else:
+        pool = json.load(open(a.pool, encoding='utf-8'))
+        win = finalize(pool, read_results(a.results), cfg)
+        checked = sum(1 for c in pool if c.get('kream_url'))
+        open(a.o, 'w', encoding='utf-8').write(render(win, cfg, datetime.now(KST), checked))
+        print(f'{checked}개 확인 → 수익 상품 {len(win)}개 → {a.o}')
+        for c in win:
+            szs = ', '.join(f"{sz} {v['price']:,}(+{v['profit']:,})" for sz, v in c['sizes'].items())
+            print(f"{c['style_code']:14} 매입 {c['buy']:>9,}  손익분기 {c['break_even']:>9,}  {c['name']} | {szs}")
 
 
 if __name__ == '__main__':
