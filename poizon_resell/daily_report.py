@@ -65,6 +65,30 @@ def attach_products(pool, search_results):
     return pool
 
 
+def size_key(size):
+    """'W235' / '235' / '235mm' → '235' (무신사·크림 사이즈 표기 맞추기)."""
+    import re as _re
+    m = _re.search(r'\d{2,3}(?:\.\d)?', str(size))
+    return m.group(0) if m else str(size).strip().upper()
+
+
+def apply_stock(winners, stock):
+    """stock: {무신사 상품 URL: {"in_stock": [...], "sold_out": [...]}}. 재고 없는 사이즈 제거, 정보 없으면 '재고 미확인' 표시."""
+    out = []
+    for c in winners:
+        info = stock.get(c['url'])
+        if info is None:
+            out.append(dict(c, stock_checked=False))
+            continue
+        avail = {size_key(s) for s in info.get('in_stock') or []}
+        sizes = {sz: v for sz, v in c['sizes'].items() if size_key(sz) in avail}
+        if sizes:
+            out.append(dict(c, sizes=sizes, stock_checked=True,
+                            best_profit=max(v['profit'] for v in sizes.values())))
+    out.sort(key=lambda c: c['best_profit'], reverse=True)
+    return out
+
+
 def finalize(pool, product_results, cfg, n=10):
     """사이즈별 최근 체결가가 손익분기 이상인 상품만, 예상 순이익 큰 순으로."""
     vat_ok = r.SOURCE_VAT.get('musinsa', False)
@@ -106,7 +130,7 @@ def render(cands, cfg, now, checked=0):
     <dt>손익분기 판매가</dt><dd>{won(c['break_even'])}</dd>
     <dt>크림 누적 거래</dt><dd>{(k['total_trades'] or 0):,}건</dd>
   </dl>
-  <div class="szh">수익 나는 사이즈 (최근 실제 체결가 기준)</div>
+  <div class="szh">수익 나는 사이즈 (최근 실제 체결가 기준) · {'무신사 재고 확인됨' if c.get('stock_checked') else '무신사 재고 미확인'}</div>
   <ul class="sizes">{sizes}</ul>
   <div class="acts"><a href="{e(c['url'])}" target="_blank" rel="noopener">무신사에서 사이즈 확인</a>
   <a href="{e(c['kream_url'])}" target="_blank" rel="noopener">크림 시세</a>
@@ -178,6 +202,9 @@ def main(argv=None):
     p.add_argument('pool'); p.add_argument('results', nargs='+')
     p = sub.add_parser('final', help='크림 상품 페이지 → 수익 상품 리포트')
     p.add_argument('pool'); p.add_argument('results', nargs='+'); p.add_argument('-o', default='report.html')
+    p.add_argument('--stock', help='무신사 사이즈 재고 JSON {상품URL: {"in_stock": [...]}}')
+    p = sub.add_parser('winners', help='수익 상품의 무신사 URL과 수익 사이즈 출력 (재고 확인용)')
+    p.add_argument('pool'); p.add_argument('results', nargs='+')
     a = ap.parse_args(argv)
     cfg = r.load_config()
     if a.cmd == 'urls':
@@ -190,9 +217,16 @@ def main(argv=None):
         pool = attach_products(json.load(open(a.pool, encoding='utf-8')), read_results(a.results))
         open(a.pool, 'w', encoding='utf-8').write(json.dumps(pool, ensure_ascii=False))
         print('\n'.join(c['kream_url'] for c in pool if c.get('kream_url')))
+    elif a.cmd == 'winners':
+        pool = json.load(open(a.pool, encoding='utf-8'))
+        for c in finalize(pool, read_results(a.results), cfg, n=30):
+            print(c['url'], ','.join(c['sizes']))
     else:
         pool = json.load(open(a.pool, encoding='utf-8'))
-        win = finalize(pool, read_results(a.results), cfg)
+        win = finalize(pool, read_results(a.results), cfg, n=30)
+        if a.stock:
+            win = apply_stock(win, json.load(open(a.stock, encoding='utf-8')))
+        win = win[:10]
         checked = sum(1 for c in pool if c.get('kream_url'))
         open(a.o, 'w', encoding='utf-8').write(render(win, cfg, datetime.now(KST), checked))
         print(f'{checked}개 확인 → 수익 상품 {len(win)}개 → {a.o}')

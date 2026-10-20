@@ -58,3 +58,14 @@ class FinalizeTests(unittest.TestCase):
         self.assertEqual(win[0]['sizes']['W235']['profit'], r.profit(59600, 106000, cfg))
         html = d.render(win, cfg, __import__('datetime').datetime(2026, 10, 20), checked=2)
         self.assertIn('W235', html)
+
+
+class StockTests(unittest.TestCase):
+    def test_apply_stock(self):
+        import daily_report as d
+        w = [{'url': 'a', 'sizes': {'W235': {'profit': 30}, 'W240': {'profit': 10}}, 'best_profit': 30},
+             {'url': 'b', 'sizes': {'290': {'profit': 50}}, 'best_profit': 50},
+             {'url': 'c', 'sizes': {'260': {'profit': 5}}, 'best_profit': 5}]
+        out = d.apply_stock(w, {'a': {'in_stock': ['240', '250']}, 'b': {'in_stock': ['280']}})
+        self.assertEqual([(c['url'], list(c['sizes'])) for c in out], [('a', ['W240']), ('c', ['260'])])
+        self.assertTrue(out[0]['stock_checked']); self.assertFalse(out[1]['stock_checked'])
