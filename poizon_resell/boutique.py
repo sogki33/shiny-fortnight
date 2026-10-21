@@ -34,6 +34,38 @@ def build_pool(raw_paths, per_brand=15):
     return cands
 
 
+RANKING_URL = ('https://api.musinsa.com/api2/hm/web/v5/pans/ranking?storeCode=boutique&sectionId=200'
+               '&categoryCode=000&gf=A&ageBand=AGE_BAND_ALL&period=DAILY')
+
+
+def parse_ranking(text):
+    """부티크 랭킹 API 응답 → 순위대로 상품 목록."""
+    j = json.loads(text)
+    items = [it for m in j['data']['modules'] if m.get('type') == 'MULTICOLUMN'
+             for it in m.get('items', []) if it.get('type') == 'PRODUCT_COLUMN']
+    out, seen = [], set()
+    for it in items:
+        if it['id'] in seen:
+            continue
+        seen.add(it['id'])
+        info = it['info']
+        out.append({'rank': len(out) + 1, 'goods_no': it['id'], 'brand': info.get('brandName', ''),
+                    'name': info.get('productName', ''), 'buy': int(info.get('finalPrice') or 0),
+                    'discount': info.get('discountRatio') or 0,
+                    'url': f"https://www.musinsa.com/products/{it['id']}"})
+    return out
+
+
+def style_code_from_page(result):
+    """무신사 상품 페이지(fetch 결과)의 설명/제목에서 제품번호."""
+    import re
+    for field in (result.get('description') or '', result.get('title') or '', result.get('text') or ''):
+        m = re.search(r'제품번호\s*:?\s*([A-Za-z0-9][A-Za-z0-9\- ]{3,30}?)(?:\s+제품|\s*$|\s*-\s|\n)', field)
+        if m:
+            return m.group(1).strip()
+    return None
+
+
 def kream_break_even(buy, target=10000):
     s = buy + target
     while kream.kream_profit(buy, s) < target:  # 수수료가 구간식이라 단순 반복으로 찾는다
@@ -88,11 +120,35 @@ def main(argv=None):
     ap = argparse.ArgumentParser()
     sub = ap.add_subparsers(dest='cmd', required=True)
     sub.add_parser('urls')
+    sub.add_parser('ranking-url')
+    p = sub.add_parser('rank', help='랭킹 응답(fetch 결과 파일) → 순위 목록, 무신사 상품 URL 출력')
+    p.add_argument('results'); p.add_argument('-o', default='pool.json')
+    p = sub.add_parser('codes', help='무신사 상품 페이지 → 제품번호 붙이고 크림 검색 URL 출력')
+    p.add_argument('pool'); p.add_argument('results', nargs='+')
     p = sub.add_parser('pool'); p.add_argument('raw', nargs='+'); p.add_argument('-o', default='pool.json')
     p = sub.add_parser('final'); p.add_argument('pool'); p.add_argument('results', nargs='+'); p.add_argument('-o', default='boutique.html')
     a = ap.parse_args(argv)
     if a.cmd == 'urls':
         print('\n'.join(musinsa_url(b) for b in BRANDS))
+    elif a.cmd == 'ranking-url':
+        print(RANKING_URL)
+    elif a.cmd == 'rank':
+        res = d.read_results([a.results])
+        text = next(v['text'] for k, v in res.items() if 'ranking' in (k or ''))
+        pool = parse_ranking(text)
+        open(a.o, 'w', encoding='utf-8').write(json.dumps(pool, ensure_ascii=False))
+        print('\n'.join(c['url'] for c in pool))
+    elif a.cmd == 'codes':
+        pool = json.load(open(a.pool, encoding='utf-8'))
+        pages = d.read_results(a.results)
+        for c in pool:
+            res = pages.get(c['url'])
+            c['style_code'] = style_code_from_page(res) if res else None
+            if c['style_code']:
+                c['break_even'] = kream_break_even(c['buy'])
+        pool = [c for c in pool if c.get('style_code')]
+        open(a.pool, 'w', encoding='utf-8').write(json.dumps(pool, ensure_ascii=False))
+        print('\n'.join(kream.search_url(c['style_code']) for c in pool))
     elif a.cmd == 'pool':
         pool = build_pool(a.raw)
         open(a.o, 'w', encoding='utf-8').write(json.dumps(pool, ensure_ascii=False))

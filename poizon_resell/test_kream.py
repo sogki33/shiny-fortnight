@@ -93,3 +93,18 @@ class RecentTests(unittest.TestCase):
         trades = [{'size': '40', 'price': 1480000, 'when': '22/05/01'}, {'size': '42', 'price': 900000, 'when': '3일 전'},
                   {'size': '42', 'price': 950000, 'when': '26/10/10'}]
         self.assertEqual(k.instant_sell_estimate(trades, today=date(2026, 10, 21)), {'42': 900000})
+
+
+class BoutiqueRankTests(unittest.TestCase):
+    def test_style_code_from_page(self):
+        import boutique as b
+        res = {'description': '제품분류 :신발 > 스니커즈 브랜드 : 아디다스(ADIDAS) 제품번호 : IG0669 제품 : 가젤 - 블랙:옐로우 / IG0669 - 50,990'}
+        self.assertEqual(b.style_code_from_page(res), 'IG0669')
+        self.assertIsNone(b.style_code_from_page({'description': '무신사 추천 상품'}))
+
+    def test_parse_ranking(self):
+        import boutique as b, json
+        col = lambda i, n, p: {'type': 'PRODUCT_COLUMN', 'id': i, 'info': {'brandName': 'B', 'productName': n, 'finalPrice': p}}
+        text = json.dumps({'data': {'modules': [{'type': 'TAB'}, {'type': 'MULTICOLUMN', 'items': [col('1', 'a', 100), col('2', 'b', 200)]},
+                                                {'type': 'MULTICOLUMN', 'items': [col('1', 'a', 100)]}]}})
+        self.assertEqual([(x['rank'], x['goods_no'], x['buy']) for x in b.parse_ranking(text)], [(1, '1', 100), (2, '2', 200)])
