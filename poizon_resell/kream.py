@@ -49,11 +49,11 @@ def parse_product(text):
     }
 
 
-def profitable_sizes(trades, break_even):
-    """최근 체결가가 손익분기 이상인 사이즈 → {사이즈: 최고 체결가}."""
+def profitable_sizes(trades, break_even, today=None, days=30):
+    """최근 days일 체결가가 손익분기 이상인 사이즈 → {사이즈: 최고 체결가}. 오래된 거래는 제외."""
     out = {}
     for t in trades:
-        if t['price'] >= break_even:
+        if t['price'] >= break_even and is_recent(t['when'], today, days):
             out[t['size']] = max(out.get(t['size'], 0), t['price'])
     return out
 
