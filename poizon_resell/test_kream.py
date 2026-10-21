@@ -108,3 +108,9 @@ class BoutiqueRankTests(unittest.TestCase):
         text = json.dumps({'data': {'modules': [{'type': 'TAB'}, {'type': 'MULTICOLUMN', 'items': [col('1', 'a', 100), col('2', 'b', 200)]},
                                                 {'type': 'MULTICOLUMN', 'items': [col('1', 'a', 100)]}]}})
         self.assertEqual([(x['rank'], x['goods_no'], x['buy']) for x in b.parse_ranking(text)], [(1, '1', 100), (2, '2', 200)])
+
+
+class SizeFormatTests(unittest.TestCase):
+    def test_eu_and_letter_sizes(self):
+        text = '모델번호 V1\nEU 36W\n\n344,000원\n\n26/09/30\nL\n\n250,000원\n\n2일 전\n'
+        self.assertEqual([t['size'] for t in k.parse_product(text)['trades']], ['EU 36W', 'L'])

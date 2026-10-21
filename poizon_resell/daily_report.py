@@ -98,8 +98,8 @@ def finalize(pool, product_results, cfg, n=10):
         if not res:
             continue
         info = kream.parse_product(res.get('text') or '')
-        if info['model'] and r.normalize_code(c['style_code']) not in r.normalize_code(info['model']):
-            continue  # 다른 상품으로 연결된 경우 제외
+        if not info['model'] or r.normalize_code(c['style_code']) not in r.normalize_code(info['model']):
+            continue  # 모델번호가 없거나 다르면 다른 상품일 수 있어 제외  # 다른 상품으로 연결된 경우 제외
         sizes = kream.profitable_sizes(info['trades'], c['break_even'])
         if not sizes:
             continue

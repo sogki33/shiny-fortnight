@@ -6,7 +6,7 @@
 import re
 from urllib.parse import quote
 
-TRADE_RE = re.compile(r'\n([A-Z]{0,3}\d{2,3}(?:\.\d)?|ONE SIZE|XS|S|M|L|XL|XXL)\n\n([\d,]+)원\n\n([^\n]*전|\d{2}/\d{2}/\d{2})')
+TRADE_RE = re.compile(r'\n((?:[A-Z]{1,3} ?)?\d{1,3}(?:\.\d)?[A-Z]{0,2}|ONE SIZE|XXS|XS|S|M|L|XL|XXL|XXXL)\n\n([\d,]+)원\n\n([^\n]*전|\d{2}/\d{2}/\d{2})')
 
 
 def search_url(style_code):
