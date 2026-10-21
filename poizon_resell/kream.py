@@ -56,3 +56,25 @@ def profitable_sizes(trades, break_even):
         if t['price'] >= break_even:
             out[t['size']] = max(out.get(t['size'], 0), t['price'])
     return out
+
+
+# 크림 판매 수수료 (2026.3.2 기준, 레벨1, 부가세 별도) — 일반/프리미엄 중 큰 쪽으로 보수적으로 계산
+KREAM_FEE = {'rate': 0.06, 'base': 2500, 'premium_rate': 0.03, 'premium_base': 20000, 'vat': 0.10, 'shipping': 3500}
+
+
+def kream_fee(sell, fee=KREAM_FEE):
+    raw = max(sell * fee['rate'] + fee['base'], sell * fee['premium_rate'] + fee['premium_base'])
+    return round(raw * (1 + fee['vat']))
+
+
+def kream_profit(buy, sell, fee=KREAM_FEE):
+    """크림에 팔았을 때 순이익 (개인 판매 기준, 부가세 환급 없음)."""
+    return round(sell - kream_fee(sell, fee) - fee['shipping'] - buy)
+
+
+def instant_sell_estimate(trades):
+    """사이즈별 즉시판매 추정가 = 최근 체결가 중 가장 낮은 값 (구매 입찰가는 로그인해야 보여서 보수적으로 추정)."""
+    out = {}
+    for t in trades:
+        out[t['size']] = min(out.get(t['size'], t['price']), t['price'])
+    return out

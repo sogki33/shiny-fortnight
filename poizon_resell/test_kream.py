@@ -69,3 +69,19 @@ class StockTests(unittest.TestCase):
         out = d.apply_stock(w, {'a': {'in_stock': ['240', '250']}, 'b': {'in_stock': ['280']}})
         self.assertEqual([(c['url'], list(c['sizes'])) for c in out], [('a', ['W240']), ('c', ['260'])])
         self.assertTrue(out[0]['stock_checked']); self.assertFalse(out[1]['stock_checked'])
+
+
+class KreamFeeTests(unittest.TestCase):
+    def test_fee_uses_larger_of_general_and_premium(self):
+        self.assertEqual(k.kream_fee(100000), round((20000 + 3000) * 1.1))     # 저가는 프리미엄 기본료가 큼
+        self.assertEqual(k.kream_fee(1000000), round((60000 + 2500) * 1.1))   # 고가는 일반 6%가 큼
+
+    def test_instant_sell_uses_lowest_trade(self):
+        p = k.parse_product(PAGE)
+        self.assertEqual(k.instant_sell_estimate(p['trades'])['W235'], 88000)
+
+    def test_boutique_break_even(self):
+        import boutique as b
+        be = b.kream_break_even(500000)
+        self.assertGreaterEqual(k.kream_profit(500000, be), 10000)
+        self.assertLess(k.kream_profit(500000, be - 1000), 10000)
