@@ -123,6 +123,8 @@ def main(argv=None):
     sub.add_parser('ranking-url')
     p = sub.add_parser('rank', help='랭킹 응답(fetch 결과 파일) → 순위 목록, 무신사 상품 URL 출력')
     p.add_argument('results'); p.add_argument('-o', default='pool.json')
+    p = sub.add_parser('prep', help='다른 쇼핑몰 상품 목록 JSON [{source,rank,brand,name,buy,style_code,url}] → 후보군 + 크림 검색 URL')
+    p.add_argument('items', nargs='+'); p.add_argument('-o', default='pool.json')
     p = sub.add_parser('codes', help='무신사 상품 페이지 → 제품번호 붙이고 크림 검색 URL 출력')
     p.add_argument('pool'); p.add_argument('results', nargs='+')
     p = sub.add_parser('pool'); p.add_argument('raw', nargs='+'); p.add_argument('-o', default='pool.json')
@@ -138,6 +140,20 @@ def main(argv=None):
         pool = parse_ranking(text)
         open(a.o, 'w', encoding='utf-8').write(json.dumps(pool, ensure_ascii=False))
         print('\n'.join(c['url'] for c in pool))
+    elif a.cmd == 'prep':
+        pool, seen = [], set()
+        for path in a.items:
+            for c in json.load(open(path, encoding='utf-8')):
+                code = (c.get('style_code') or '').strip()
+                if not code or not c.get('buy') or (c.get('source'), r.normalize_code(code)) in seen:
+                    continue
+                seen.add((c.get('source'), r.normalize_code(code)))
+                c.setdefault('discount', 0)
+                c['brand'] = f"[{c.get('source', '')}] {c.get('brand', '')}"
+                c['break_even'] = kream_break_even(int(c['buy']))
+                pool.append(c)
+        open(a.o, 'w', encoding='utf-8').write(json.dumps(pool, ensure_ascii=False))
+        print('\n'.join(kream.search_url(c['style_code']) for c in pool))
     elif a.cmd == 'codes':
         pool = json.load(open(a.pool, encoding='utf-8'))
         pages = d.read_results(a.results)
