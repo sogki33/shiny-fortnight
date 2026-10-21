@@ -72,9 +72,23 @@ def kream_profit(buy, sell, fee=KREAM_FEE):
     return round(sell - kream_fee(sell, fee) - fee['shipping'] - buy)
 
 
-def instant_sell_estimate(trades):
-    """사이즈별 즉시판매 추정가 = 최근 체결가 중 가장 낮은 값 (구매 입찰가는 로그인해야 보여서 보수적으로 추정)."""
+def is_recent(when, today=None, days=30):
+    """'3시간 전', '2일 전' 같은 표기나 'YY/MM/DD' 날짜가 최근 days일 이내인지."""
+    from datetime import date
+    if when.endswith('전'):
+        return True
+    try:
+        y, m, d = (int(x) for x in when.split('/'))
+        return ((today or date.today()) - date(2000 + y, m, d)).days <= days
+    except ValueError:
+        return False
+
+
+def instant_sell_estimate(trades, today=None, days=30):
+    """사이즈별 즉시판매 추정가 = 최근 days일 체결가 중 가장 낮은 값 (오래된 거래는 제외)."""
     out = {}
     for t in trades:
+        if not is_recent(t['when'], today, days):
+            continue
         out[t['size']] = min(out.get(t['size'], t['price']), t['price'])
     return out

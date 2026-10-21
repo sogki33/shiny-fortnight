@@ -85,3 +85,11 @@ class KreamFeeTests(unittest.TestCase):
         be = b.kream_break_even(500000)
         self.assertGreaterEqual(k.kream_profit(500000, be), 10000)
         self.assertLess(k.kream_profit(500000, be - 1000), 10000)
+
+
+class RecentTests(unittest.TestCase):
+    def test_old_trades_ignored(self):
+        from datetime import date
+        trades = [{'size': '40', 'price': 1480000, 'when': '22/05/01'}, {'size': '42', 'price': 900000, 'when': '3일 전'},
+                  {'size': '42', 'price': 950000, 'when': '26/10/10'}]
+        self.assertEqual(k.instant_sell_estimate(trades, today=date(2026, 10, 21)), {'42': 900000})
