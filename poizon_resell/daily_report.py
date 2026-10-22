@@ -100,7 +100,8 @@ def finalize(pool, product_results, cfg, n=10):
         info = kream.parse_product(res.get('text') or '')
         if not info['model'] or r.normalize_code(c['style_code']) not in r.normalize_code(info['model']):
             continue  # 모델번호가 없거나 다르면 다른 상품일 수 있어 제외  # 다른 상품으로 연결된 경우 제외
-        sizes = kream.profitable_sizes(info['trades'], c['break_even'])
+        est = kream.instant_sell_estimate(info['trades'])
+        sizes = {sz: p for sz, p in est.items() if p >= c['break_even']}
         if not sizes:
             continue
         c = dict(c, kream=info, sizes={sz: {'price': pr, 'profit': r.profit(c['buy'], pr, cfg, vat_ok)}
@@ -130,7 +131,7 @@ def render(cands, cfg, now, checked=0):
     <dt>손익분기 판매가</dt><dd>{won(c['break_even'])}</dd>
     <dt>크림 누적 거래</dt><dd>{(k['total_trades'] or 0):,}건</dd>
   </dl>
-  <div class="szh">수익 나는 사이즈 (최근 실제 체결가 기준) · {'무신사 재고 확인됨' if c.get('stock_checked') else '무신사 재고 미확인'}</div>
+  <div class="szh">수익 나는 사이즈 (최근 30일 체결가 중 최저, 2건 이상) · {'무신사 재고 확인됨' if c.get('stock_checked') else '무신사 재고 미확인'}</div>
   <ul class="sizes">{sizes}</ul>
   <div class="acts"><a href="{e(c['url'])}" target="_blank" rel="noopener">무신사에서 사이즈 확인</a>
   <a href="{e(c['kream_url'])}" target="_blank" rel="noopener">크림 시세</a>
@@ -175,7 +176,7 @@ a:focus-visible, button:focus-visible {{ outline:2px solid var(--accent); outlin
   <p class="sub">{now:%Y년 %m월 %d일 %H:%M} 기준 · {checked}개 상품의 실제 체결가를 확인해 수익 나는 {len(cands)}개만 남김</p></header>
   <div class="how"><b>기준</b><ol>
     <li>무신사에서 지금 살 수 있는 가격으로 매입.</li>
-    <li>크림 최근 체결가가 손익분기(순이익 {won(cfg['min_profit'])}) 이상인 <b>사이즈만</b> 표시.</li>
+    <li>사이즈별 최근 30일 체결이 2건 이상이고, 그중 <b>가장 낮은</b> 체결가도 손익분기(순이익 {won(cfg['min_profit'])}) 이상인 사이즈만 표시.</li>\n    <li><b>실제 즉시판매가(구매 입찰 최고가)는 크림 로그인 후에만 보여 확인하지 못했습니다. 사기 전에 크림 앱에서 그 사이즈 구매 입찰가를 꼭 확인하세요.</b></li>
     <li>무신사에 그 사이즈 재고가 있는지, 포이즌 앱 시세도 같은지 확인한 뒤 사세요.</li></ol></div>
   <ul>{body}</ul>
   <p class="foot">계산: 수수료 {cfg['fee_rate']:.0%}(최소 {won(cfg['min_fee'])}), 배송비 {won(cfg['shipping'])},

@@ -84,11 +84,20 @@ def is_recent(when, today=None, days=30):
         return False
 
 
-def instant_sell_estimate(trades, today=None, days=30):
-    """사이즈별 즉시판매 추정가 = 최근 days일 체결가 중 가장 낮은 값 (오래된 거래는 제외)."""
-    out = {}
+def instant_sell_estimate(trades, today=None, days=30, min_trades=2):
+    """사이즈별 즉시판매 추정가 = 최근 days일 체결가 중 가장 낮은 값.
+
+    실제 즉시판매가(구매 입찰 최고가)는 로그인해야 보여서 체결가로 추정한다.
+    한 번 튄 거래에 속지 않도록 그 사이즈 체결이 min_trades건 이상일 때만 쓴다.
+    """
+    prices = {}
     for t in trades:
-        if not is_recent(t['when'], today, days):
-            continue
-        out[t['size']] = min(out.get(t['size'], t['price']), t['price'])
-    return out
+        if is_recent(t['when'], today, days):
+            prices.setdefault(t['size'], []).append(t['price'])
+    est = {sz: min(ps) for sz, ps in prices.items() if len(ps) >= min_trades}
+    # 다른 사이즈보다 20% 넘게 비싸게 체결된 사이즈는 구매 입찰이 그 가격까지 받쳐주지 않는 경우가 많아 제외
+    allp = sorted(p for ps in prices.values() for p in ps)
+    if len(allp) >= 3:
+        median = allp[len(allp) // 2]
+        est = {sz: p for sz, p in est.items() if p <= median * 1.2}
+    return est

@@ -14,6 +14,15 @@ W235\n\n106,000원\n\n1시간 전
 
 
 class KreamTests(unittest.TestCase):
+    def setUp(self):
+        import kream as kk
+        self._recent = kk.is_recent
+        kk.is_recent = lambda when, today=None, days=30: True  # 샘플 페이지의 'N시간 전'과 날짜를 모두 최근으로
+
+    def tearDown(self):
+        import kream as kk
+        kk.is_recent = self._recent
+
     def test_parse_product(self):
         p = k.parse_product(PAGE)
         self.assertEqual(p['model'], 'ID0478')
@@ -54,8 +63,9 @@ class FinalizeTests(unittest.TestCase):
         win = d.finalize(pool, {'https://kream.co.kr/products/196266': {'text': PAGE},
                                 'https://kream.co.kr/products/2': {'text': gazelle}}, cfg)
         self.assertEqual([c['style_code'] for c in win], ['ID0478'])
-        self.assertEqual(set(win[0]['sizes']), {'W235', 'W240'})
-        self.assertEqual(win[0]['sizes']['W235']['profit'], r.profit(59600, 106000, cfg))
+        # W240은 체결 1건뿐이라 제외, W235는 3건 중 최저가(88,000)로 계산
+        self.assertEqual(set(win[0]['sizes']), {'W235'})
+        self.assertEqual(win[0]['sizes']['W235']['profit'], r.profit(59600, 88000, cfg))
         html = d.render(win, cfg, __import__('datetime').datetime(2026, 10, 20), checked=2)
         self.assertIn('W235', html)
 
@@ -93,6 +103,8 @@ class RecentTests(unittest.TestCase):
         trades = [{'size': '40', 'price': 1480000, 'when': '22/05/01'}, {'size': '42', 'price': 900000, 'when': '3일 전'},
                   {'size': '42', 'price': 950000, 'when': '26/10/10'}]
         self.assertEqual(k.instant_sell_estimate(trades, today=date(2026, 10, 21)), {'42': 900000})
+        # 한 건뿐인 사이즈는 제외
+        self.assertEqual(k.instant_sell_estimate(trades[:2], today=date(2026, 10, 21)), {})
 
 
 class BoutiqueRankTests(unittest.TestCase):
@@ -114,3 +126,13 @@ class SizeFormatTests(unittest.TestCase):
     def test_eu_and_letter_sizes(self):
         text = '모델번호 V1\nEU 36W\n\n344,000원\n\n26/09/30\nL\n\n250,000원\n\n2일 전\n'
         self.assertEqual([t['size'] for t in k.parse_product(text)['trades']], ['EU 36W', 'L'])
+
+
+class OutlierTests(unittest.TestCase):
+    def test_rare_expensive_size_dropped(self):
+        from datetime import date
+        tr = lambda sz, p: {'size': sz, 'price': p, 'when': '1일 전'}
+        trades = [tr('7', 1265000), tr('7', 1300000), tr('4', 830000), tr('4', 840000), tr('3', 850000), tr('3', 845000)]
+        est = k.instant_sell_estimate(trades, today=date(2026, 10, 22))
+        self.assertNotIn('7', est)
+        self.assertEqual(est['4'], 830000)
