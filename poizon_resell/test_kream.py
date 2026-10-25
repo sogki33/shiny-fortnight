@@ -65,7 +65,7 @@ class FinalizeTests(unittest.TestCase):
         self.assertEqual([c['style_code'] for c in win], ['ID0478'])
         # W240은 체결 1건뿐이라 제외, W235는 3건 중 최저가(88,000)로 계산
         self.assertEqual(set(win[0]['sizes']), {'W235'})
-        self.assertEqual(win[0]['sizes']['W235']['profit'], r.profit(59600, 88000, cfg))
+        self.assertEqual(win[0]['sizes']['W235']['profit'], max(r.profit(59600, 88000, cfg), k.kream_profit(59600, 88000)))
         html = d.render(win, cfg, __import__('datetime').datetime(2026, 10, 20), checked=2)
         self.assertIn('W235', html)
 
