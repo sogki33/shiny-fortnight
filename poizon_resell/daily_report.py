@@ -101,8 +101,6 @@ def finalize(pool, product_results, cfg, n=10):
         if not info['model'] or r.normalize_code(c['style_code']) not in r.normalize_code(info['model']):
             continue  # 모델번호가 없거나 다르면 다른 상품일 수 있어 제외  # 다른 상품으로 연결된 경우 제외
         est = kream.instant_sell_estimate(info['trades'])
-        if info['ask']:  # 지금 즉시구매가보다 비싸게 팔릴 수는 없다
-            est = {sz: min(pr, info['ask']) for sz, pr in est.items()}
         # 크림 체결가로 크림에 되파는 순이익과, 같은 가격을 포이즌 판매가로 본 순이익 중 큰 쪽
         sizes = {}
         for sz, pr in est.items():
