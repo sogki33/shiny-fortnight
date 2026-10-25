@@ -58,18 +58,20 @@ def profitable_sizes(trades, break_even, today=None, days=30):
     return out
 
 
-# 크림 판매 수수료 (2026.3.2 기준, 레벨1, 부가세 별도) — 일반/프리미엄 중 큰 쪽으로 보수적으로 계산
-KREAM_FEE = {'rate': 0.06, 'base': 2500, 'premium_rate': 0.03, 'premium_base': 20000, 'vat': 0.10, 'shipping': 3500}
+# 크림 판매 수수료 (레벨1 최고 요율, 부가세 별도). 프리미엄 요율은 샤넬·에르메스 가방, 롤렉스 시계 같은
+# 지정 카테고리에만 붙고 신발·의류는 일반 요율이다. 상한 30만 원.
+KREAM_FEE = {'rate': 0.06, 'base': 2500, 'premium_rate': 0.03, 'premium_base': 20000,
+             'cap': 300000, 'vat': 0.10, 'shipping': 3500}
 
 
-def kream_fee(sell, fee=KREAM_FEE):
-    raw = max(sell * fee['rate'] + fee['base'], sell * fee['premium_rate'] + fee['premium_base'])
-    return round(raw * (1 + fee['vat']))
+def kream_fee(sell, fee=KREAM_FEE, premium=False):
+    raw = sell * fee['premium_rate'] + fee['premium_base'] if premium else sell * fee['rate'] + fee['base']
+    return round(min(raw, fee['cap']) * (1 + fee['vat']))
 
 
-def kream_profit(buy, sell, fee=KREAM_FEE):
+def kream_profit(buy, sell, fee=KREAM_FEE, premium=False):
     """크림에 팔았을 때 순이익 (개인 판매 기준, 부가세 환급 없음)."""
-    return round(sell - kream_fee(sell, fee) - fee['shipping'] - buy)
+    return round(sell - kream_fee(sell, fee, premium) - fee['shipping'] - buy)
 
 
 def is_recent(when, today=None, days=30):

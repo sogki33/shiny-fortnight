@@ -82,9 +82,9 @@ class StockTests(unittest.TestCase):
 
 
 class KreamFeeTests(unittest.TestCase):
-    def test_fee_uses_larger_of_general_and_premium(self):
-        self.assertEqual(k.kream_fee(100000), round((20000 + 3000) * 1.1))     # 저가는 프리미엄 기본료가 큼
-        self.assertEqual(k.kream_fee(1000000), round((60000 + 2500) * 1.1))   # 고가는 일반 6%가 큼
+    def test_fee_general_by_default_premium_only_when_asked(self):
+        self.assertEqual(k.kream_fee(100000), round((6000 + 2500) * 1.1))
+        self.assertEqual(k.kream_fee(1000000, premium=True), round((30000 + 20000) * 1.1))
 
     def test_instant_sell_uses_lowest_trade(self):
         p = k.parse_product(PAGE)

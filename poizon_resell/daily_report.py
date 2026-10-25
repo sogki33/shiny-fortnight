@@ -101,11 +101,18 @@ def finalize(pool, product_results, cfg, n=10):
         if not info['model'] or r.normalize_code(c['style_code']) not in r.normalize_code(info['model']):
             continue  # 모델번호가 없거나 다르면 다른 상품일 수 있어 제외  # 다른 상품으로 연결된 경우 제외
         est = kream.instant_sell_estimate(info['trades'])
-        sizes = {sz: p for sz, p in est.items() if p >= c['break_even']}
+        if info['ask']:  # 지금 즉시구매가보다 비싸게 팔릴 수는 없다
+            est = {sz: min(pr, info['ask']) for sz, pr in est.items()}
+        # 크림 체결가로 크림에 되파는 순이익과, 같은 가격을 포이즌 판매가로 본 순이익 중 큰 쪽
+        sizes = {}
+        for sz, pr in est.items():
+            kp, pp = kream.kream_profit(c['buy'], pr), r.profit(c['buy'], pr, cfg, vat_ok)
+            best, ch = (kp, '크림') if kp >= pp else (pp, '포이즌')
+            if best >= cfg['min_profit']:
+                sizes[sz] = {'price': pr, 'profit': best, 'channel': ch}
         if not sizes:
             continue
-        c = dict(c, kream=info, sizes={sz: {'price': pr, 'profit': r.profit(c['buy'], pr, cfg, vat_ok)}
-                                       for sz, pr in sizes.items()})
+        c = dict(c, kream=info, sizes=sizes)
         c['best_profit'] = max(v['profit'] for v in c['sizes'].values())
         winners.append(c)
     winners.sort(key=lambda c: c['best_profit'], reverse=True)
@@ -120,7 +127,7 @@ def render(cands, cfg, now, checked=0):
     e = html.escape
     rows = []
     for i, c in enumerate(cands, 1):
-        sizes = ''.join(f'<li><b>{e(sz)}</b> 체결 {won(v["price"])} → 순이익 <b class="pf">{won(v["profit"])}</b></li>'
+        sizes = ''.join(f'<li><b>{e(sz)}</b> 체결 {won(v["price"])} → {v.get("channel", "")} 순이익 <b class="pf">{won(v["profit"])}</b></li>'
                         for sz, v in sorted(c['sizes'].items(), key=lambda kv: -kv[1]['profit']))
         k = c['kream']
         rows.append(f'''<li class="card">
