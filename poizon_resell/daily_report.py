@@ -29,11 +29,59 @@ def musinsa_url(keyword, size=60):
             f'&gf=A&sortCode=DISCOUNT_RATE&page=1&size={size}&caller=SEARCH')
 
 
+def musinsa_web_url(keyword):
+    """API가 빈 목록을 돌려줄 때 쓰는 무신사 웹 검색 페이지 (할인율순)."""
+    from urllib.parse import quote
+    return 'https://www.musinsa.com/search/goods?keyword=' + quote(keyword) + '&gf=A&sortCode=DISCOUNT_RATE'
+
+
+def parse_web_search(result):
+    """웹 검색 페이지(fetch_content markdown, links 포함) → API 목록과 같은 모양의 상품 dict 목록."""
+    import re as _re
+    lines = [l.strip() for l in (result.get('text') or '').split('\n')]
+    links = []
+    for l in result.get('links') or []:
+        if _re.fullmatch(r'https://www\.musinsa\.com/products/\d+', l) and l not in links:
+            links.append(l)
+    items = []
+    for i, line in enumerate(lines):
+        m = _re.fullmatch(r'([\d,]+)원', line)
+        if not m or i < 2:
+            continue
+        j = i - 1
+        disc = 0
+        dm = _re.fullmatch(r'(\d{1,2})%', lines[j])
+        if dm:
+            disc, j = int(dm.group(1)), j - 1
+        name, brand = lines[j], lines[j - 1]
+        reviews = 0
+        for k in (i + 1, i + 2):
+            rm = k < len(lines) and _re.fullmatch(r'\(([\d,]+)(천\+)?\)', lines[k])
+            if rm:
+                reviews = int(rm.group(1).replace(',', '')) * (1000 if rm.group(2) else 1)
+                break
+        items.append({'goodsName': name, 'brandName': brand, 'finalPrice': int(m.group(1).replace(',', '')),
+                      'finalDiscount': disc, 'reviewCount': reviews, 'isSoldOut': False})
+    # 상품 링크는 카드 순서대로 하나씩 나온다. 개수가 맞을 때만 연결한다.
+    if len(links) == len(items):
+        for g, link in zip(items, links):
+            g['goodsLinkUrl'] = link
+    else:
+        for g in items:
+            g['goodsLinkUrl'] = musinsa_web_url(g['goodsName'].rsplit('/', 1)[-1].strip())
+    return items
+
+
 def load_items(paths):
+    """API 응답 JSON 또는 웹 검색 페이지 fetch 결과({"results": [...]})를 모두 받는다."""
     items = []
     for p in paths:
         data = json.loads(open(p, encoding='utf-8').read())
-        items += (data.get('data') or {}).get('list') or []
+        if isinstance(data, dict) and 'results' in data:
+            for res in data['results']:
+                items += parse_web_search(res)
+        else:
+            items += (data.get('data') or {}).get('list') or []
     return items
 
 
@@ -202,6 +250,7 @@ def main(argv=None):
     ap = argparse.ArgumentParser(description='1) urls → 2) pool → 3) products → 4) final')
     sub = ap.add_subparsers(dest='cmd', required=True)
     sub.add_parser('urls', help='무신사 검색 URL 출력')
+    sub.add_parser('weburls', help='무신사 웹 검색 URL 출력 (API가 비었을 때)')
     p = sub.add_parser('pool', help='무신사 raw JSON → 후보군 + 크림 검색 URL 출력')
     p.add_argument('raw', nargs='+'); p.add_argument('-o', default='pool.json')
     p = sub.add_parser('products', help='크림 검색 결과 → 상품 URL 출력')
@@ -215,6 +264,8 @@ def main(argv=None):
     cfg = r.load_config()
     if a.cmd == 'urls':
         print('\n'.join(musinsa_url(k) for k in KEYWORDS))
+    elif a.cmd == 'weburls':
+        print('\n'.join(musinsa_web_url(k) for k in KEYWORDS))
     elif a.cmd == 'pool':
         pool = build_pool(a.raw, cfg)
         open(a.o, 'w', encoding='utf-8').write(json.dumps(pool, ensure_ascii=False))

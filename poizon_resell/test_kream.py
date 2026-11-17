@@ -136,3 +136,19 @@ class OutlierTests(unittest.TestCase):
         est = k.instant_sell_estimate(trades, today=date(2026, 10, 22))
         self.assertNotIn('7', est)
         self.assertEqual(est['4'], 830000)
+
+
+class WebSearchTests(unittest.TestCase):
+    def test_parse_web_search(self):
+        import daily_report as d
+        text = ('할인율순\n플레이키즈프로\n나이키빅스우시자켓 (베이비) 블랙\n40%\n47,400원\n최저가 도전\n옵션\n남성\n'
+                '나이키\n에어 맥스 코코 샌들 W - 블랙 / CI8798-003\n40%\n77,400원\n4.9\n(362)\n무료반품\n옵션\n'
+                '나이키\n드라이 핏 캡 - 블랙 / FB5625-010\n10%\n31,500원\n4.8\n(1천+)\n옵션\n'
+                '나이키\n버로우 M - 블랙 / FJ6040-001\n79,000원\n4.0\n(1)\n옵션\n')
+        links = ['https://www.musinsa.com/brand/nike'] + [f'https://www.musinsa.com/products/{i}' for i in range(4)]
+        items = d.parse_web_search({'text': text, 'links': links})
+        self.assertEqual([g['finalPrice'] for g in items], [47400, 77400, 31500, 79000])
+        self.assertEqual(items[1]['goodsName'], '에어 맥스 코코 샌들 W - 블랙 / CI8798-003')
+        self.assertEqual((items[1]['brandName'], items[1]['finalDiscount'], items[1]['reviewCount']), ('나이키', 40, 362))
+        self.assertEqual(items[2]['reviewCount'], 1000)
+        self.assertEqual((items[3]['finalDiscount'], items[3]['goodsLinkUrl']), (0, 'https://www.musinsa.com/products/3'))
