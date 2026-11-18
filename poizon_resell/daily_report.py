@@ -18,7 +18,7 @@ import resell as r
 
 KST = timezone(timedelta(hours=9))
 # 매일 조회할 무신사 검색어 (할인율순)
-KEYWORDS = ['나이키 스니커즈', '아디다스 스니커즈', '뉴발란스 스니커즈', '아식스 스니커즈', '살로몬 스니커즈',
+KEYWORDS = ['나이키 운동화', '아디다스 스니커즈', '뉴발란스 스니커즈', '아식스 스니커즈', '살로몬 스니커즈',
             '오니츠카타이거 스니커즈', '호카 운동화', '온러닝 운동화', '푸마 스니커즈', '컨버스 스니커즈',
             '반스 스니커즈', '미즈노 스니커즈']
 
@@ -38,29 +38,32 @@ def musinsa_web_url(keyword):
 def parse_web_search(result):
     """웹 검색 페이지(fetch_content markdown, links 포함) → API 목록과 같은 모양의 상품 dict 목록."""
     import re as _re
-    lines = [l.strip() for l in (result.get('text') or '').split('\n')]
+    lines = [l.strip() for l in (result.get('text') or '').split('\n') if l.strip()]
     links = []
     for l in result.get('links') or []:
         if _re.fullmatch(r'https://www\.musinsa\.com/products/\d+', l) and l not in links:
             links.append(l)
     items = []
     for i, line in enumerate(lines):
-        m = _re.fullmatch(r'([\d,]+)원', line)
+        # '40%' / '77,400원' 이 따로 오거나 '40%77,400원' 처럼 붙어서 온다
+        m = _re.fullmatch(r'(?:(\d{1,2})%)?([\d,]+)원', line)
         if not m or i < 2:
             continue
         j = i - 1
-        disc = 0
+        disc = int(m.group(1)) if m.group(1) else 0
         dm = _re.fullmatch(r'(\d{1,2})%', lines[j])
-        if dm:
+        if dm and not m.group(1):
             disc, j = int(dm.group(1)), j - 1
         name, brand = lines[j], lines[j - 1]
+        if ' / ' in brand or brand.endswith('원'):  # 브랜드와 상품명이 한 줄에 붙은 형식
+            brand = ''
         reviews = 0
         for k in (i + 1, i + 2):
-            rm = k < len(lines) and _re.fullmatch(r'\(([\d,]+)(천\+)?\)', lines[k])
+            rm = k < len(lines) and _re.search(r'\(([\d,]+)(천\+)?\)$', lines[k])
             if rm:
                 reviews = int(rm.group(1).replace(',', '')) * (1000 if rm.group(2) else 1)
                 break
-        items.append({'goodsName': name, 'brandName': brand, 'finalPrice': int(m.group(1).replace(',', '')),
+        items.append({'goodsName': name, 'brandName': brand, 'finalPrice': int(m.group(2).replace(',', '')),
                       'finalDiscount': disc, 'reviewCount': reviews, 'isSoldOut': False})
     # 상품 링크는 카드 순서대로 하나씩 나온다. 개수가 맞을 때만 연결한다.
     if len(links) == len(items):
