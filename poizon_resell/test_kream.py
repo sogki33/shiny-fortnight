@@ -152,3 +152,15 @@ class WebSearchTests(unittest.TestCase):
         self.assertEqual((items[1]['brandName'], items[1]['finalDiscount'], items[1]['reviewCount']), ('나이키', 40, 362))
         self.assertEqual(items[2]['reviewCount'], 1000)
         self.assertEqual((items[3]['finalDiscount'], items[3]['goodsLinkUrl']), (0, 'https://www.musinsa.com/products/3'))
+
+
+    def test_parse_web_search_joined_lines(self):
+        import daily_report as d
+        text = ('할인율순\n\n나이키마리나 W - 블랙:화이트 / IH2381-001\n\n35%25,350원\n\n4.8(129)\n\n무료반품\n\n'
+                '나이키페가수스 42 W - 아이보리 / IB1881-106\n\n30%118,300원\n\n4.9(7)\n\n옵션\n')
+        url = d.musinsa_web_url('나이키 운동화')
+        items = d.parse_web_search({'url': url, 'text': text,
+                                    'links': ['https://www.musinsa.com/products/1', 'https://www.musinsa.com/products/2']})
+        self.assertEqual([(g['brandName'], g['goodsName'], g['finalDiscount'], g['finalPrice'], g['reviewCount']) for g in items],
+                         [('나이키', '마리나 W - 블랙:화이트 / IH2381-001', 35, 25350, 129),
+                          ('나이키', '페가수스 42 W - 아이보리 / IB1881-106', 30, 118300, 7)])

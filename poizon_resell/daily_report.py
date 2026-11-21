@@ -35,6 +35,13 @@ def musinsa_web_url(keyword):
     return 'https://www.musinsa.com/search/goods?keyword=' + quote(keyword) + '&gf=A&sortCode=DISCOUNT_RATE'
 
 
+def _kw_brand(url):
+    """검색 URL의 검색어 첫 단어 (예: '나이키 운동화' → '나이키')."""
+    from urllib.parse import parse_qs, urlparse
+    kw = (parse_qs(urlparse(url).query).get('keyword') or [''])[0]
+    return kw.split()[0] if kw else ''
+
+
 def parse_web_search(result):
     """웹 검색 페이지(fetch_content markdown, links 포함) → API 목록과 같은 모양의 상품 dict 목록."""
     import re as _re
@@ -55,8 +62,12 @@ def parse_web_search(result):
         if dm and not m.group(1):
             disc, j = int(dm.group(1)), j - 1
         name, brand = lines[j], lines[j - 1]
-        if ' / ' in brand or brand.endswith('원'):  # 브랜드와 상품명이 한 줄에 붙은 형식
+        joined = m.group(1) is not None or ' / ' in brand or brand.endswith(('원', ')', '도착보장', '옵션', '할인율순', '무료반품'))
+        if joined:  # 브랜드와 상품명이 한 줄에 붙은 형식
             brand = ''
+            kw = _kw_brand(result.get('url') or '')
+            if kw and name.startswith(kw):
+                brand, name = kw, name[len(kw):]
         reviews = 0
         for k in (i + 1, i + 2):
             rm = k < len(lines) and _re.search(r'\(([\d,]+)(천\+)?\)$', lines[k])
