@@ -97,6 +97,14 @@ class MusinsaTests(unittest.TestCase):
         self.assertIn('blocked', errors[0])
 
 
+class ModelMatchTests(unittest.TestCase):
+    def test_whole_code_only(self):
+        self.assertTrue(r.model_matches('AR0454', 'AR0454/100000153'))
+        self.assertTrue(r.model_matches('1203B376-020', '1203B376-020'))
+        self.assertFalse(r.model_matches('401063-02', '2401-063-021500-303'))
+        self.assertFalse(r.model_matches('ID0478', None))
+
+
 class DiscordTests(unittest.TestCase):
     def test_only_ok_results_are_sent(self):
         s = MagicMock()

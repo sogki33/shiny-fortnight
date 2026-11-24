@@ -80,7 +80,7 @@ def finalize(pool, product_results, target=10000):
         if not res:
             continue
         info = kream.parse_product(res.get('text') or '')
-        if not info['model'] or r.normalize_code(c['style_code']) not in r.normalize_code(info['model']):
+        if not r.model_matches(c['style_code'], info['model']):
             continue  # 모델번호가 없거나 다르면 다른 상품일 수 있어 제외
         sizes = {sz: {'price': p, 'profit': kream.kream_profit(c['buy'], p)}
                  for sz, p in kream.instant_sell_estimate(info['trades']).items()}

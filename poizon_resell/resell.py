@@ -122,6 +122,12 @@ def normalize_code(code):
     return re.sub(r'[^A-Z0-9]', '', (code or '').upper())
 
 
+def model_matches(code, model):
+    """크림 모델번호(여러 개면 '/'로 구분)에 품번이 통째로 있는지. 부분 문자열 일치는 다른 상품일 수 있다."""
+    want = normalize_code(code)
+    return bool(want) and any(normalize_code(t) == want for t in re.split(r'[/,\s]+', model or ''))
+
+
 @dataclass
 class Offer:
     source: str

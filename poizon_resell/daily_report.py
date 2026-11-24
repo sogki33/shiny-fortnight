@@ -160,7 +160,7 @@ def finalize(pool, product_results, cfg, n=10):
         if not res:
             continue
         info = kream.parse_product(res.get('text') or '')
-        if not info['model'] or r.normalize_code(c['style_code']) not in r.normalize_code(info['model']):
+        if not r.model_matches(c['style_code'], info['model']):
             continue  # 모델번호가 없거나 다르면 다른 상품일 수 있어 제외  # 다른 상품으로 연결된 경우 제외
         est = kream.instant_sell_estimate(info['trades'])
         # 크림 체결가로 크림에 되파는 순이익과, 같은 가격을 포이즌 판매가로 본 순이익 중 큰 쪽
