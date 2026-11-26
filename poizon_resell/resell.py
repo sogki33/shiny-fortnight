@@ -125,7 +125,9 @@ def normalize_code(code):
 def model_matches(code, model):
     """크림 모델번호(여러 개면 '/'로 구분)에 품번이 통째로 있는지. 부분 문자열 일치는 다른 상품일 수 있다."""
     want = normalize_code(code)
-    return bool(want) and any(normalize_code(t) == want for t in re.split(r'[/,\s]+', model or ''))
+    # 반스는 무신사 품번 끝에 '1'이 더 붙는 경우가 있다 (VN0A2Z5I18G1 ↔ VN0A2Z5I18G)
+    alt = want[:-1] if want.startswith('VN') and want.endswith('1') else None
+    return bool(want) and any(normalize_code(t) in (want, alt) for t in re.split(r'[/,\s]+', model or ''))
 
 
 @dataclass

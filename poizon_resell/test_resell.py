@@ -103,6 +103,7 @@ class ModelMatchTests(unittest.TestCase):
         self.assertTrue(r.model_matches('1203B376-020', '1203B376-020'))
         self.assertFalse(r.model_matches('401063-02', '2401-063-021500-303'))
         self.assertFalse(r.model_matches('ID0478', None))
+        self.assertTrue(r.model_matches('VN0A2Z5I18G1', 'VN0A2Z5I18G'))
 
 
 class DiscordTests(unittest.TestCase):
